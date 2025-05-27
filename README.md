@@ -20,7 +20,9 @@
 5. Push Button
 
 ### Software:
-1. 
+1. GPIO
+2. rpi_ws281x
+3. mido
 ## System Diagram
 ## Code Logic
 ## Upload Code
