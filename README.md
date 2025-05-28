@@ -36,7 +36,7 @@ D[Neopixel]
 E[Midi Controller]
 
 A --Ground--> B
-A --One Line--> C
+A --One Wire--> C
 B --Ground--> C
 C --GPIO 18--> D
 C --Ground--> D
