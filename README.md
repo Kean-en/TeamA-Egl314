@@ -38,7 +38,7 @@ E[Midi Controller]
 A --Ground--> B
 A --One Line--> C
 B --Ground--> C
-C --DIN--> D
+C --GPIO 18--> D
 C --Ground--> D
 C --USB--> E
 Power --5V--> D
