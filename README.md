@@ -21,8 +21,12 @@ Colours will be randomised and flashed on the colour wheel (neopixel) to win, 2 
 4. Midi Controller
 5. Push Button
 
-### Software:
-1. GPIO
+### Software
+1. RealVNC 
+2. Visual Studio Code
+3. Raspbian OS
+### Python Packages:
+1. GPIO 
 2. rpi_ws281x
 3. mido
 ## System Diagram
