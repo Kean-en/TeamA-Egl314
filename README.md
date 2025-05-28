@@ -26,6 +26,24 @@ Colours will be randomised and flashed on the colour wheel (neopixel) to win, 2 
 2. rpi_ws281x
 3. mido
 ## System Diagram
+
+```mermaid
+graph LR
+A[Button]
+B[Breadboard]
+C[Raspberry PI]
+D[Neopixel]
+E[Midi Controller]
+
+A --Ground--> B
+A --One Line--> C
+B --Ground--> C
+C --DIN--> D
+C --Ground--> D
+C --USB--> E
+Power --5V--> D
+```
+
 ## Code Logic
 <h3> Neopixel: </h3>
 <h4> 1. Configuration </h4>
