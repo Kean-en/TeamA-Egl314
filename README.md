@@ -178,14 +178,111 @@ if __name__ == "__main__":
 
 This ensures the game starts only when the script is run directly.
 
+---
+<h3>Push Button:</h3>
+<h4>1: Set-up</h4>
+
+Importing function and values from midi.py:
+
+```python
+from midi import *
+```
+
+Pin Setup:
+
+```python
+button_pin = 17  # If the button is on GPIO 17
+GPIO.setmode(GPIO.BCM)  # Use Broadcom pin-numbering scheme
+GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Button pin set as input w/ pull-up
+```
+
+<h4>2: Toggle Function</h4>
+
+```python
+toggle = 0  # Variable to toggle between 0 and 1
+
+# This function will be called when the button is pressed
+def button_callback(channel):
+    global toggle
+    toggle = 1 - toggle  # Toggle the value
+    if toggle == 1:
+        start()
+        print("Toggle On!")
+        
+    if toggle == 0: 
+        stop()
+        print("Toggle off.")
+```
+When the button is pressed, it will change the toggle value to 1 or 0.<br>
+1 being for on, 0 being for off
+
+<h5>Functions:</h5>
+
+Start()
+
+```python
+def start():
+    os.system("sudo ~/egl314/bin/python ledon.py") # Executes ledon.py
+    for row in launchpad_grid:
+        for note in row:
+            outport.send(mido.Message('note_on', note=note, velocity=COLOR_MAP['flash'])) # Turns all grids on the Launchpad red, values imported from midi.py
+```
+
+ledon.py contains a function to turn all the led on the Neopixel white
+
+ledon.py
+
+```python
+for i in range(strip.numPixels()):
+    strip.setPixelColor(i, Color(255, 240, 200)) # Sets all the led to white
+strip.show()
+```
+
+---
+
+Stop()
+
+```python
+def stop():
+    os.system("sudo ~/egl314/bin/python ledoff.py") # Executes ledoff.py 
+    clear() # Imported Function from midi.py
+```
+
+ledoff.py contains a function to turn all the led off
+
+ledoff.py
+
+```python
+for i in range(strip.numPixels()):
+    strip.setPixelColor(i, Color(0, 0, 0)) # Sets all the led to off
+strip.show()
+```
+
+---
+
+Clear()
+
+```python
+def clear():# Turns all the pads off by sending velocity=0 to all notes.
+    for row in launchpad_grid:
+        for note in row:
+            outport.send(mido.Message('note_on', note=note, velocity=0))
+```
+
+<h4>3: Loop</h4>
+
+```python
+try:
+    print("Press the button to turn on or off.")
+    while True:
+        # Main loop does nothing, just waits for button events
+        time.sleep(0.1)
+except KeyboardInterrupt:
+    # Clean up GPIO on CTRL+C exit
+    GPIO.cleanup()
+```
+
+Loops the script.
 
 
 
-
-
-
-
-
- 
-
-## Upload Code
