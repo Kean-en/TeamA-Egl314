@@ -1,23 +1,9 @@
 import RPi.GPIO as GPIO
 import time
 import os
-from midi import *
-
-def start():
-    os.system("sudo ~/egl314/bin/python ledon.py")
-    for row in launchpad_grid:
-        for note in row:
-            outport.send(mido.Message('note_on', note=note, velocity=COLOR_MAP['flash']))
-
-def stop():
-    os.system("sudo ~/egl314/bin/python ledoff.py")
-    clear()
-
-stop()
-
 
 # Pin Setup:
-button_pin = 17  # Assuming you connected the button to GPIO 17
+button_pin = 15  # Assuming you connected the button to GPIO 15
 GPIO.setmode(GPIO.BCM)  # Use Broadcom pin-numbering scheme
 GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Button pin set as input w/ pull-up
 
@@ -28,12 +14,12 @@ def button_callback(channel):
     global toggle
     toggle = 1 - toggle  # Toggle the value
     if toggle == 1:
-        start()
-        print("Toggle On!")
-        
+        print("Game On!")
+        os.system("sudo ~/egl314/bin/python GameFinal.py")
+
     if toggle == 0: 
-        stop()
-        print("Toggle off.")
+        os.system("sudo ~/egl314/bin/python ledoff.py")
+        print("Game off.")
 
 
 
