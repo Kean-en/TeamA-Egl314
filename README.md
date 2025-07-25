@@ -63,7 +63,7 @@ C --Ground--> D
 C --USB--> E
 C --USB--> F
 Power --5V--> D
-C --Port 8000--> G
+C --Wifi--> G
 C --Wifi--> I
 I --LAN--> J
 J --LAN--> H
