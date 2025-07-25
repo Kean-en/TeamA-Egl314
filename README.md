@@ -1,7 +1,12 @@
 ![alt text](image.png)
 # Project L.U.M.E.N - Prism Cipher
 ## Introduction
-Colours will be randomised and flashed on the colour wheel (neopixel) to win, 2 players must tap the midi pad in the correct sequence shown by the colour wheel within a time limit
+Project L.U.M.E.N takes place in Sector 536 - A cosmic frontier within NYP , named after the classroom where it all began. This project is inspired by Singapore's growing investment in space research and technology. Sector 536 invites guests to explore a series of immersive space stationed at the edge of the unknown, these are the 4 exhibits :
+
+Station 1 - Laser Defence Protocol
+Station 2 - Kinetic Core Recharge
+Station 3 - Chromatic Defence Simulator
+Station 4 - Launch Core Override
 
   <h2 align = "center">
   Presented by:<br>
