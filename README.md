@@ -1,4 +1,4 @@
-![alt text](image.png)
+![alt text](Images/image.png)
 # Project L.U.M.E.N - Prism Cipher
 ## Introduction
 Project L.U.M.E.N takes place in Sector 536 - A cosmic frontier within NYP , named after the classroom where it all began. This project is inspired by Singapore's growing investment in space research and technology. Sector 536 invites guests to explore a series of immersive space stationed at the edge of the unknown, these are the 4 exhibits :
@@ -38,6 +38,8 @@ Station 4 - Launch Core Override
 1. GPIO 
 2. rpi_ws281x
 3. mido
+4. osc
+5. rtmidi
 ## System Diagram
 
 ```mermaid
@@ -48,6 +50,8 @@ C[Raspberry PI]
 D[Neopixel]
 E[Midi Controller 1]
 F[Midi Controller 2]
+G[Reaper]
+H[grandMA3]
 
 A --Ground--> B
 A --One Wire--> C
@@ -57,6 +61,7 @@ C --Ground--> D
 C --USB--> E
 C --USB--> F
 Power --5V--> D
+C --Port 8000--> G
 ```
 
 # MVP Memory Game
