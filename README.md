@@ -25,6 +25,8 @@ Colours will be randomised and flashed on the colour wheel (neopixel) to win, 2 
 1. RealVNC 
 2. Visual Studio Code
 3. Raspbian OS
+4. Reaper
+5. L-ISA
 ### Python Packages:
 1. GPIO 
 2. rpi_ws281x
@@ -37,7 +39,8 @@ A[Button]
 B[Breadboard]
 C[Raspberry PI]
 D[Neopixel]
-E[Midi Controller]
+E[Midi Controller 1]
+F[Midi Controller 2]
 
 A --Ground--> B
 A --One Wire--> C
@@ -45,6 +48,7 @@ B --Ground--> C
 C --GPIO 18--> D
 C --Ground--> D
 C --USB--> E
+C --USB--> F
 Power --5V--> D
 ```
 
