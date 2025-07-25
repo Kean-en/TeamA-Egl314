@@ -1,7 +1,9 @@
 # Introduction
 
 <br>
+
 This section documents the game logic that handles MIDI input/output for the **Launchpad Pro MK3** and RGB LED control using **NeoPixel** on a **Raspberry Pi**.
+
 <br><br>
 
 The game uses:
@@ -236,7 +238,7 @@ def main():
 |**Component**|**Purpose**|**Key Functions**|
 |--------|--------|:--------:|
 |NeoPixel LED  |Visual Feedback |show_color(), clear_pixels()  |
-|Launchpad MIDI   |Pad light control  |	clear_launchpad()  |
+|Launchpad MIDI   |Pad light control  |	clear_launchpad(), main()  |
 |GPIO Button   |Start/stop input  |wait_for_button_hold(), monitor_stop() |
 |Threads   |	Stop game detection  |monitor_stop() |
 
