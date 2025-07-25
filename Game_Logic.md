@@ -15,7 +15,7 @@ The game uses:
 <br><br>
 
 # NeoPixel Setup and Functions
-**Strip Configuration**
+### Strip Configuration
 ```
 python
 from rpi_ws281x import Color, Adafruit_NeoPixel
@@ -28,7 +28,7 @@ strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN)
  * LED_PIN: GPIO pin used to control the strip.
  <br>
 
- **Initialize the Strip**
+ ### Initialize the Strip
  ```
 strip.begin()
 
@@ -36,7 +36,7 @@ strip.begin()
 This is called once during game setup to start communication with the strip.
 <br>
 
-**Function: show_color(color)**
+### Function: show_color(color)
  ```
 def show_color(color):
     for i in range(strip.numPixels()):
@@ -48,7 +48,7 @@ def show_color(color):
 * Lights up the entire NeoPixel strip with a given Color(R, G, B).
 * Used to give visual cues (e.g., green = ready, red = stop).
 
-**Function: clear_pixels()**
+### Function: clear_pixels()
 ```
 def clear_pixels():
     for i in range(strip.numPixels()):
@@ -61,7 +61,7 @@ def clear_pixels():
 <br>
 
 # MIDI Launchpad Logic
-**Setup**
+### Setup
 ```
 import mido
 
@@ -77,7 +77,7 @@ outports = [mido.open_output(p) for p in MIDI_PORTS]
 * Opens two Launchpad Pro MK3 MIDI outputs.
 * The ports in this example 28:0 and 32:0 are 2 seperate midis each with different ports
 
-**Check Midi Ports**
+### Check Midi Ports
 ```
 import mido
 
@@ -104,7 +104,7 @@ Available MIDI Output Ports:
 
 
 ```
-**Function: clear_launchpad()**
+### Function: clear_launchpad()
 ```
 def clear_launchpad():
     for outport in outports:
@@ -125,7 +125,7 @@ GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 ```
 * Sets up GPIO 17 with a pull-up resistor to detect button presses.
-**Function: stop_game()**
+### Function: stop_game()
 ```
 def stop_game():
     print("[Game Paused] Game is now stopped.")
@@ -137,7 +137,7 @@ def stop_game():
 
 ```
 * Pauses the game and waits for a new hold to resume.
-**Function: monitor_stop()**
+### Function: monitor_stop()
 ```
 def monitor_stop():
     while True:
@@ -151,7 +151,7 @@ def monitor_stop():
 ```
 * Runs in a background thread to detect 4-second hold to pause the game.
 
-**Function: wait_for_button_hold()**
+### Function: wait_for_button_hold()
 ```
 def wait_for_button_hold():
     print("Hold the button to start the game (2s)...")
@@ -186,14 +186,14 @@ def wait_for_button_hold():
      * Green = ready
 
 # Main Game Loop
-**Game Entry Point**
+### Game Entry Point
 ```
 if __name__ == '__main__':
     main()
 
 ```
 
-**main() Function**
+### main() Function
 ```
 def main():
     try:
