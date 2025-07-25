@@ -10,10 +10,10 @@ Station 4 - Launch Core Override
 
   <h2 align = "center">
   Presented by:<br>
-  <a href="https://github.com/syakiltrm"><img src="https://avatars.githubusercontent.com/u/208737626?v=4&size=64" title="tl0wh" width="40" height="40"></a>
-  <a href="https://github.com/Kean-en"><img src="https://avatars.githubusercontent.com/u/109288203?v=4" title="AhSohs" width="40" height="40"></a>
-  <a href="https://github.com/ArifYazid05"><img src="https://avatars.githubusercontent.com/u/208737017?v=4" title="srylqwerty" width="40" height="40"></a>
-  <a href="https://github.com/Wayne-Teo"><img src="https://avatars.githubusercontent.com/u/208737553?v=4" title="dariensiew" width="40" height="40"></a>
+  <a href="https://github.com/syakiltrm"><img src="https://avatars.githubusercontent.com/u/208737626?v=4&size=64" title="syakiltrm" width="40" height="40"></a>
+  <a href="https://github.com/Kean-en"><img src="https://avatars.githubusercontent.com/u/109288203?v=4" title="Kean-en" width="40" height="40"></a>
+  <a href="https://github.com/ArifYazid05"><img src="https://avatars.githubusercontent.com/u/208737017?v=4" title="ArifYazid05" width="40" height="40"></a>
+  <a href="https://github.com/Wayne-Teo"><img src="https://avatars.githubusercontent.com/u/208737553?v=4" title="Wayne-Teo" width="40" height="40"></a>
 </h2>
 
 
@@ -46,12 +46,14 @@ Station 4 - Launch Core Override
 graph LR
 A[Button]
 B[Breadboard]
-C[Raspberry PI]
+C[Raspberry PI Client]
 D[Neopixel]
 E[Midi Controller 1]
 F[Midi Controller 2]
 G[Reaper]
 H[grandMA3]
+I[Raspberry PI Server]
+J[GrandMa3 on PC node]
 
 A --Ground--> B
 A --One Wire--> C
@@ -62,6 +64,9 @@ C --USB--> E
 C --USB--> F
 Power --5V--> D
 C --Port 8000--> G
+C --Wifi--> I
+I --LAN--> J
+J --LAN--> H
 ```
 
 # MVP Memory Game
