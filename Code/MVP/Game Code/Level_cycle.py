@@ -1,145 +1,120 @@
 # Level_cycle.py
 
-import RPi.GPIO as GPIO
-import time
-import threading
 import mido
-import random
-from rpi_ws281x import Color, Adafruit_NeoPixel
-from pythonosc import udp_client
+import time
+import board
+import neopixel
+from rpi_ws281x import Color
+import RPi.GPIO as GPIO
 
-BUTTON_PIN = 17
-
-# === OSC CLIENT SETUP ===
-REAPER_CLIENT = udp_client.SimpleUDPClient("192.168.254.12", 8000)
-LIGHT_CLIENT = udp_client.SimpleUDPClient("192.168.254.213", 2000)
-
-# === MIDI Setup ===
-MIDI_PORT = "Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0"
-inport = mido.open_input(MIDI_PORT)
-outport = mido.open_output(MIDI_PORT)
-
-# === NeoPixel Setup ===
+# NeoPixel setup
 LED_COUNT = 120
-LED_PIN = 18
-strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN)
-strip.begin()
+strip = neopixel.NeoPixel(board.D18, LED_COUNT, brightness=0.5, auto_write=False)
 
-# === Launchpad Grid ===
-launchpad_grid = [[(r + 1) * 10 + (c + 1) for c in range(8)] for r in range(8)]
-
-LEVEL_SHAPES = {
-    0: [launchpad_grid[0][4], launchpad_grid[1][4], launchpad_grid[2][4], launchpad_grid[3][4], launchpad_grid[4][4]],
-    1: [launchpad_grid[0][3], launchpad_grid[0][4], launchpad_grid[0][5],
-        launchpad_grid[1][3],
-        launchpad_grid[2][3], launchpad_grid[2][4], launchpad_grid[2][5],
-        launchpad_grid[3][5],
-        launchpad_grid[4][3], launchpad_grid[4][4], launchpad_grid[4][5]],
-    2: [launchpad_grid[0][3], launchpad_grid[0][4], launchpad_grid[0][5],
-        launchpad_grid[1][5],
-        launchpad_grid[2][3], launchpad_grid[2][4], launchpad_grid[2][5],
-        launchpad_grid[3][5],
-        launchpad_grid[4][3], launchpad_grid[4][4], launchpad_grid[4][5]]
-}
-
-# Confirm block: bottom right 2x2
-CONFIRM_BLOCK = [launchpad_grid[y][x] for y in range(6, 8) for x in range(6, 8)]
-
-COLOR_OFF = 0
-COLOR_GREEN = 21
-COLOR_BLUE = 73
-
+# Button GPIO
+BUTTON_PIN = 17
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-button_event = threading.Event()
-level_index = 0
+# Launchpad ports
+inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
+outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
 
-def show_solid_color(color):
-    for i in range(strip.numPixels()):
-        strip.setPixelColor(i, color)
-    strip.show()
+launchpad_grid = [[81 - 10 * r + c for c in range(8)] for r in range(8)]
 
-def get_random_color():
-    colors = [Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255),
-              Color(255, 255, 0), Color(255, 0, 255), Color(0, 255, 255)]
-    return random.choice(colors)
+COLOR_MAP = {
+    'off': 0,
+    'red': 5,
+    'green': 21,
+    'white': 122
+}
 
-def button_callback(channel):
-    button_event.set()
+def clear_board(outport):
+    for row in launchpad_grid:
+        for note in row:
+            outport.send(mido.Message('note_on', note=note, velocity=0))
 
-GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_callback, bouncetime=300)
+def fill_board(outport, color):
+    vel = COLOR_MAP[color]
+    for row in launchpad_grid:
+        for note in row:
+            outport.send(mido.Message('note_on', note=note, velocity=vel))
 
-def clear_launchpad():
-    for note in range(0, 128):
-        outport.send(mido.Message('note_on', note=note, velocity=COLOR_OFF))
+def show_level(outport, level):
+    clear_board(outport)
+    color = COLOR_MAP['green']
+    for y in range(level):
+        for x in range(8):
+            outport.send(mido.Message('note_on', note=launchpad_grid[y][x], velocity=color))
 
-def draw_level_selection(index):
-    clear_launchpad()
-    for note in LEVEL_SHAPES[index]:
-        outport.send(mido.Message('note_on', note=note, velocity=COLOR_BLUE))
-    for note in CONFIRM_BLOCK:
-        outport.send(mido.Message('note_on', note=note, velocity=COLOR_GREEN))
-
-def select_level():
-    global level_index
-    cooldown_until = time.time() + 3  # prevent button triggers for 3s
-
-    # === Lighting startup ===
-    print("[OSC] LIGHT: Off thru Sequence")
-    LIGHT_CLIENT.send_message("/gma3/cmd", "Off thru Sequence")
-
-    print("[OSC] LIGHT: Go+ Sequence 52")
-    LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 52")
-
-    # Clear MIDI buffer
-    try:
-        while True:
-            msg = inport.receive(block=False)
-            if msg is None:
-                break
-    except:
-        pass
-
-    while GPIO.input(BUTTON_PIN) == GPIO.LOW:
-        time.sleep(0.01)
-    time.sleep(0.1)
-
-    print("Press button to cycle levels. Press 2x2 green block to confirm.")
-    draw_level_selection(level_index)
-    show_solid_color(get_random_color())
+def wait_for_start_button(reaper_client):
+    print("[WAIT] Holding button for 2s to start...")
+    hold_time = 2
+    start_time = None
+    filling = False
 
     while True:
-        if button_event.is_set():
-            # Debounce window active: ignore early button press
-            if time.time() < cooldown_until:
-                print("[DEBOUNCE] Skipping early button press to protect /marker/25")
-                button_event.clear()
-                continue
+        if GPIO.input(BUTTON_PIN) == GPIO.LOW:
+            if start_time is None:
+                start_time = time.time()
+            held = time.time() - start_time
 
-            # Handle level cycling
-            button_event.clear()
-            level_index = (level_index + 1) % 3
-            draw_level_selection(level_index)
-            show_solid_color(get_random_color())
+            # Fill visual
+            if not filling:
+                print("[FILL] Button held, filling NeoPixel white")
+                filling = True
 
-         
+            fill_pixels(strip, (255, 255, 255), held / hold_time)
+        else:
+            if start_time:
+                if time.time() - start_time >= hold_time:
+                    print("[OSC] REAPER: /marker 25")
+                    reaper_client.send_message("/marker", 25)
+                    reaper_client.send_message("/action", 1007)
+                    strip.fill((0, 0, 0))
+                    strip.show()
+                    return
+            start_time = None
+            filling = False
+            strip.fill((0, 0, 0))
+            strip.show()
+        time.sleep(0.01)
 
-            print("[OSC] REAPER: /marker/26")
-            REAPER_CLIENT.send_message("/marker/26", 1.0)
+def fill_pixels(strip, color, ratio):
+    count = int(ratio * strip.n)
+    for i in range(strip.n):
+        strip[i] = color if i < count else (0, 0, 0)
+    strip.show()
 
-            time.sleep(0.3)
+def select_level(reaper_client):
+    level = 1
+    print("[OSC] REAPER: /marker 26")
+    reaper_client.send_message("/marker", 26)
+    reaper_client.send_message("/action", 1007)
 
-        msg = inport.receive(block=False)
+    show_level(outport1, level)
+    show_level(outport2, level)
+
+    while True:
+        msg1 = inport1.receive(block=False)
+        msg2 = inport2.receive(block=False)
+        msg = msg1 or msg2
         if msg and msg.type == 'note_on' and msg.velocity > 0:
-            if msg.note in CONFIRM_BLOCK:
-                clear_launchpad()
-                print("Level confirmed. Waiting for new selection...")
+            note = msg.note
 
-                while GPIO.input(BUTTON_PIN) == GPIO.LOW:
-                    time.sleep(0.01)
-                time.sleep(0.5)
+            if note == launchpad_grid[7][7]:  # bottom-right confirm
+                print(f"[LEVEL] Confirmed Level {level} → /marker 28")
+                reaper_client.send_message("/marker", 28)
+                reaper_client.send_message("/action", 1007)
+                clear_board(outport1)
+                clear_board(outport2)
+                return level
 
-                return level_index + 1
-
+            if note == launchpad_grid[0][0]:  # top-left cycle
+                level = (level % 3) + 1
+                print(f"[LEVEL] Switched to Level {level}")
+                show_level(outport1, level)
+                show_level(outport2, level)
         time.sleep(0.01)
