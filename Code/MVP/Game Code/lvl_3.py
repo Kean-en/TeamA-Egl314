@@ -1,5 +1,7 @@
 # lvl_3.py
 
+# lvl_3.py
+
 import RPi.GPIO as GPIO
 import time
 import random
@@ -28,8 +30,8 @@ COLOR_MAP = {
     'off': 0
 }
 
-inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
-outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
+inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
 inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
 outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
 
@@ -177,6 +179,16 @@ def run_level_3(reaper_client, light_client, strip):
                             player['index'] += 1
                             if player['index'] == len(sequence):
                                 flash_winner(i + 1)
+
+                                if i == 0:
+                                    print("[OSC] REAPER: /marker/27 + /action/1007")
+                                    reaper_client.send_message("/marker", 27)
+                                    reaper_client.send_message("/action", 1007)
+                                else:
+                                    print("[OSC] REAPER: /marker/29 + /action/1007")
+                                    reaper_client.send_message("/marker", 29)
+                                    reaper_client.send_message("/action", 1007)
+
                                 flush_midi_input(player['inport'])
                                 clear_board(outport1)
                                 clear_board(outport2)
