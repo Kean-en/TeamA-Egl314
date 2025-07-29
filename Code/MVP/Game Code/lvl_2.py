@@ -1,5 +1,7 @@
 # lvl_2.py
 
+# lvl_2.py
+
 import RPi.GPIO as GPIO
 import time
 import random
@@ -28,8 +30,8 @@ COLOR_MAP = {
     'off': 0
 }
 
-inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
-outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
+inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
 inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
 outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
 
@@ -55,7 +57,6 @@ def show_sequence_on_strip(strip, sequence):
             if index < strip.numPixels():
                 strip.setPixelColor(index, c)
                 index += 1
-    # Clear leftovers
     while index < strip.numPixels():
         strip.setPixelColor(index, Color(0, 0, 0))
         index += 1
@@ -117,15 +118,11 @@ def run_level_2(reaper_client, light_client, strip):
 
         print("[OSC] LIGHT: Off thru Sequence")
         light_client.send_message("/gma3/cmd", "Off thru Sequence")
-
         print("[OSC] LIGHT: Go+ Sequence 55")
         light_client.send_message("/gma3/cmd", "Go+ Sequence 55")
-
         time.sleep(2)
-
         print("[OSC] LIGHT: Off thru Sequence")
         light_client.send_message("/gma3/cmd", "Off thru Sequence")
-
         print("[OSC] LIGHT: Go+ Sequence 54")
         light_client.send_message("/gma3/cmd", "Go+ Sequence 54")
 
@@ -149,6 +146,9 @@ def run_level_2(reaper_client, light_client, strip):
 
         for player in player_data:
             draw_blocks(player, sequence)
+
+        flush_midi_input(inport1)
+        flush_midi_input(inport2)
 
         winner_found = False
 
@@ -179,6 +179,16 @@ def run_level_2(reaper_client, light_client, strip):
                             player['index'] += 1
                             if player['index'] == len(sequence):
                                 flash_winner(i + 1)
+
+                                if i == 0:
+                                    print("[OSC] REAPER: /marker/27 + /action/1007")
+                                    reaper_client.send_message("/marker", 27)
+                                    reaper_client.send_message("/action", 1007)
+                                else:
+                                    print("[OSC] REAPER: /marker/29 + /action/1007")
+                                    reaper_client.send_message("/marker", 29)
+                                    reaper_client.send_message("/action", 1007)
+
                                 flush_midi_input(player['inport'])
                                 clear_board(outport1)
                                 clear_board(outport2)
@@ -188,7 +198,6 @@ def run_level_2(reaper_client, light_client, strip):
                         else:
                             print("[OSC] REAPER: /marker/30 (wrong press)")
                             reaper_client.send_message("/marker/30", 1.0)
-
                             for row in launchpad_grid:
                                 for n in row:
                                     player['outport'].send(mido.Message('note_on', note=n, velocity=COLOR_MAP['red']))
