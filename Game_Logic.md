@@ -153,76 +153,83 @@ def monitor_stop():
 
 ### Function: wait_for_button_hold()
 ```
-def wait_for_button_hold():
-    print("Hold the button to start the game (2s)...")
+def wait_for_2s_hold():
+    print("Hold the button for 2 seconds to start the game...")
+    hold_start = None
+    progress_steps = LED_COUNT  # Each pixel = progress step
+
     while True:
         if GPIO.input(BUTTON_PIN) == GPIO.LOW:
-            start_time = time.time()
-            while GPIO.input(BUTTON_PIN) == GPIO.LOW:
-                held_duration = time.time() - start_time
-                if held_duration >= 2.0:
-                    show_color(Color(0, 255, 0))  # Green
+            if hold_start is None:
+                hold_start = time.time()
+
+            held_time = time.time() - hold_start
+            progress = min(int((held_time / 2.0) * progress_steps), LED_COUNT)
+
+            # Fill NeoPixels based on hold time
+            for i in range(LED_COUNT):
+                if i < progress:
+                    strip.setPixelColor(i, Color(0, 255, 0))  # Green fill
                 else:
-                    show_color(Color(0, 0, 255))  # Blue
-                time.sleep(0.05)
-            held_time = time.time() - start_time
-            clear_pixels()
+                    strip.setPixelColor(i, Color(0, 0, 0))    # Off
+            strip.show()
+
             if held_time >= 2.0:
-                print("Game resuming...")
-
-                # Send OSC signals
-                REAPER_CLIENT.send_message("/play", 1.0)
-                REAPER_CLIENT.send_message("/marker/25", 1.0)
-                LIGHT_CLIENT.send_message("/gma3/cmd", "Off thru Sequence")
-                LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 53")
+                print("[HOLD] 2-second hold detected. Game starting.")
+                print("[OSC] LIGHT: Go+ Sequence 56")
+                LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 56")
+                strip_color_off()
                 return
-            else:
-                print("Hold longer to start.")
+        else:
+            # Reset if released early
+            hold_start = None
+            strip_color_off()
 
+        time.sleep(0.01)
 ```
 * Waits for 2-second button hold to begin the game.
 * Provides live color feedback:
-     * Blue = holding but not yet 2s
-     * Green = ready
+    * Green = ready
+    * Off = Did not hold for 2s
 
 # Main Game Loop
 ### Game Entry Point
 ```
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[EXIT] Game interrupted by user.")
+        clear_launchpads()
+        strip_color_off()
+        GPIO.cleanup()
+        exit(0)
 
 ```
 
 ### main() Function
 ```
 def main():
-    try:
-        strip.begin()
-        stop_thread = threading.Thread(target=monitor_stop, daemon=True)
-        stop_thread.start()
-        wait_for_button_hold()
+    wait_for_2s_hold()
+    send_marker(25)  # 🎙️ Start dialog marker (with playback)
 
-        while True:
-            level = select_level()
+    while True:
+        level = Level_cycle.select_level()  # sends marker 26 + 28 inside
+        clear_launchpads()
 
-            if level == 1:
-                lvl_1.run_level_1(REAPER_CLIENT, LIGHT_CLIENT, strip)
-            elif level == 2:
-                lvl_2.run_level_2(REAPER_CLIENT, LIGHT_CLIENT, strip)
-            elif level == 3:
-                lvl_3.run_level_3(REAPER_CLIENT, LIGHT_CLIENT, strip)
-            else:
-                print("Invalid level selected.")
+        if level == 1:
+            REAPER_CLIENT.send_message("/level_start", 1)
+            lvl_1.run_level_1(REAPER_CLIENT, LIGHT_CLIENT, strip)
+        elif level == 2:
+            REAPER_CLIENT.send_message("/level_start", 2)
+            lvl_2.run_level_2(REAPER_CLIENT, LIGHT_CLIENT, strip)
+        elif level == 3:
+            REAPER_CLIENT.send_message("/level_start", 3)
+            lvl_3.run_level_3(REAPER_CLIENT, LIGHT_CLIENT, strip)
 
-            clear_pixels()
-            clear_launchpad()
-
-    except KeyboardInterrupt:
-        print("Game interrupted.")
-        clear_pixels()
-        clear_launchpad()
-        GPIO.cleanup()
-        sys.exit(0)
+        clear_launchpads()
+        strip_color_off()
+        time.sleep(1)
 
 
 ```
