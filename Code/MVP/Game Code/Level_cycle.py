@@ -15,7 +15,7 @@ REAPER_CLIENT = udp_client.SimpleUDPClient("192.168.254.12", 8000)
 LIGHT_CLIENT = udp_client.SimpleUDPClient("192.168.254.213", 2000)
 
 # === MIDI Setup ===
-MIDI_PORT = "Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0"
+MIDI_PORT = "Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0"
 inport = mido.open_input(MIDI_PORT)
 outport = mido.open_output(MIDI_PORT)
 
@@ -110,11 +110,14 @@ def select_level():
     cooldown_until = time.time() + 3
     hold_start = None
 
-    print("[OSC] LIGHT: Off thru Sequence")
-    LIGHT_CLIENT.send_message("/gma3/cmd", "Off thru Sequence")
+    print("[OSC] LIGHT: Off Sequence thru Please")
+    LIGHT_CLIENT.send_message("/gma3/cmd", "Off Sequence thru Please")
 
     print("[OSC] LIGHT: Go+ Sequence 52")
     LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 52")
+    time.sleep(1)
+    print("[OSC] LIGHT: Go+ Sequence 53")
+    LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 53")
 
     try:
         while True:
@@ -187,6 +190,7 @@ def select_level():
                 strip.show()
                 clear_launchpad()
                 time.sleep(1)
+
                 exit(0)
         else:
             hold_start = None

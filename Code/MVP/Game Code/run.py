@@ -27,11 +27,11 @@ strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN)
 strip.begin()
 
 # === MIDI Setup ===
-inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
-outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 28:0")
+inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
 
-inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
-outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
+inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
+outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
 
 # === Helpers ===
 def send_marker(n: int):
@@ -72,6 +72,8 @@ def wait_for_2s_hold():
 
             if held_time >= 2.0:
                 print("[HOLD] 2-second hold detected. Game starting.")
+                print("[OSC] LIGHT: Go+ Sequence 56")
+                LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 56")
                 strip_color_off()
                 return
         else:

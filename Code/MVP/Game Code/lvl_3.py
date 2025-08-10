@@ -1,7 +1,5 @@
 # lvl_3.py
 
-# lvl_3.py
-
 import RPi.GPIO as GPIO
 import time
 import random
@@ -32,8 +30,8 @@ COLOR_MAP = {
 
 inport1 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
 outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
-inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
-outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 32:0")
+inport2 = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
+outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
 
 launchpad_grid = [[81 - 10 * r + c for c in range(8)] for r in range(8)]
 
@@ -116,13 +114,13 @@ def run_level_3(reaper_client, light_client, strip):
         print("[OSC] REAPER: /marker/26")
         reaper_client.send_message("/marker/26", 1.0)
 
-        print("[OSC] LIGHT: Off thru Sequence")
-        light_client.send_message("/gma3/cmd", "Off thru Sequence")
+        print("[OSC] LIGHT: Off Sequence thru Please")
+        light_client.send_message("/gma3/cmd", "Off Sequence thru Please")
         print("[OSC] LIGHT: Go+ Sequence 55")
         light_client.send_message("/gma3/cmd", "Go+ Sequence 55")
         time.sleep(2)
-        print("[OSC] LIGHT: Off thru Sequence")
-        light_client.send_message("/gma3/cmd", "Off thru Sequence")
+        print("[OSC] LIGHT: Off Sequence thru Please")
+        light_client.send_message("/gma3/cmd", "Off Sequence thru Please")
         print("[OSC] LIGHT: Go+ Sequence 54")
         light_client.send_message("/gma3/cmd", "Go+ Sequence 54")
 
