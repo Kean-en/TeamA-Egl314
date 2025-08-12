@@ -92,7 +92,7 @@ LED_PIN = board.D18
 strip = neopixel.NeoPixel(LED_PIN, LED_COUNT, brightness=0.5, auto_write=False)
 
 # --- GPIO Setup ---
-BUTTON_PIN = 23
+BUTTON_PIN = 17
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -104,7 +104,7 @@ LIGHT_CLIENT = SimpleUDPClient("192.168.254.213", 2000)
 ```
 - Imports all necessary modules for GPIO, NeoPixel, OSC, and custom level scripts.
 - Configures a NeoPixel LED strip with 120 LEDs connected to GPIO 18.
-- Sets up GPIO 23 as the input pin for a physical button with a pull-up resistor.
+- Sets up GPIO 17 as the input pin for a physical button with a pull-up resistor.
 - Establishes two OSC clients:
   - One for REAPER (audio cue controller).
   - One for GrandMA3 (lighting controller).
@@ -136,7 +136,7 @@ def wait_for_button_hold(threshold=2):
 
 ```
 
-- This function waits for the player to press and hold the physical button connected to GPIO 23.
+- This function waits for the player to press and hold the physical button connected to GPIO 17.
 - As the player holds the button, the NeoPixel strip progressively lights up white to show progress.
 - If held for the defined `threshold` (default 2 seconds), it:
   - Sends marker `/marker/25` and `/action/1007` to REAPER via OSC to begin the game.
