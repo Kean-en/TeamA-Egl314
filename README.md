@@ -16,6 +16,14 @@ Station 4 - Launch Core Override
   <a href="https://github.com/Wayne-Teo"><img src="https://avatars.githubusercontent.com/u/208737553?v=4" title="Wayne-Teo" width="40" height="40"></a>
 </h2>
 
+## How does our game work? **Station 3**
+1. Cadet holds the button for 2 seconds to start the game (Neopixel light for indication).
+2. Cadet gets to choose between 3 levels by pressing the button cycling through the levels.
+3. Cadet presses the 2x2 green box on the midi pad to confirm and play the selected level.
+4. After selected level has been chosen, a sequence of colours (green, yellow, blue and red) will be shown on the neopixel strip
+5. On the midi pad, multiple 2x2 colours (green, yellow, blue and red) will also be shown
+6. Cadets must press identical colours on the midi pad following the sequence shown on the neopixel strip starting from right to left.
+7. AFter Cadet is done playing, they have the option of holding the button for 3 seconds to shut down the game. 
 
 
 ## Dependencies
@@ -70,10 +78,11 @@ I --LAN--> J
 J --LAN--> H
 ```
 
+
+
 # MVP Code Logic
 
 ## run.py
-
 ```python
 import RPi.GPIO as GPIO
 import time
@@ -137,7 +146,7 @@ def wait_for_button_hold(threshold=2):
 ```
 
 - This function waits for the player to press and hold the physical button connected to GPIO 17.
-- As the player holds the button, the NeoPixel strip progressively lights up white to show progress.
+- As the player holds the button, the NeoPixel strip progressively lights up green to show progress.
 - If held for the defined `threshold` (default 2 seconds), it:
   - Sends marker `/marker/25` and `/action/1007` to REAPER via OSC to begin the game.
   - Turns off the LED strip and returns to continue execution.
@@ -166,7 +175,7 @@ def main():
   - Level 1 → `run_level_1()`
   - Level 2 → `run_level_2()`
   - Level 3 → `run_level_3()`
-- If the player presses Ctrl+C (keyboard interrupt), it cleans up the GPIO resources gracefully.
+- If the player presses Ctrl+C (keyboard interrupt), it cleans up the GPIO resources.
 
 
 ## Level_cycle.py
@@ -247,6 +256,40 @@ def wait_for_start_button(reaper_client):
 ```
 - Waits for the player to press and hold the physical GPIO button. If the button is held for 2 seconds, it sends OSC messages to REAPER to trigger the game start. While holding, the NeoPixel strip progressively lights up in white as feedback.
 
+### `Shutdown` function
+```python
+if GPIO.input(BUTTON_PIN) == GPIO.LOW:
+    if hold_start is None:
+        hold_start = time.time()
+
+    held_time = time.time() - hold_start
+    progress = min(int((held_time / 3.0) * LED_COUNT), LED_COUNT)
+
+    # Show red fill on NeoPixel as progress bar
+    for i in range(LED_COUNT):
+        if i < progress:
+            strip.setPixelColor(i, Color(255, 0, 0))
+        else:
+            strip.setPixelColor(i, Color(0, 0, 0))
+    strip.show()
+
+    # Shutdown if held for 3s
+    if held_time >= 3.0:
+        print("[HOLD] Button held 3s → shutdown initiated.")
+        send_marker(31)   # Send OSC marker to REAPER
+        for i in range(strip.numPixels()):
+            strip.setPixelColor(i, Color(0, 0, 0))
+        strip.show()
+        clear_launchpad()
+        time.sleep(1)
+        exit(0)
+```
+- Hold the button for 3 seconds during level selection.
+- NeoPixel strip fills up red as a progress bar.
+- At 3s:
+1. Sends /marker 31 + /action 1007 to REAPER.
+2. Turns off all Launchpad and NeoPixel lights.
+3. Exits the program cleanly.
 ### `select_level` Function
 ```python
 def select_level(reaper_client):
