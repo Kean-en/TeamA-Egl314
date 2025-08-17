@@ -57,6 +57,9 @@ These markers are just for sound effects during the game, 42 is played when the 
 #### Audio Track where Sound FX is cut
 <audio src="Media/Swiping Card (Among Us Task OpenCloseComplete) - Sound Effect for editing.mp3" controls></audio>
 
+### Open Sound Control (OSC)
+For How to Set up OSC for Reaper and L-ISA, please refer to [OSC Starter Kit](https://github.com/huats-club/oscstarterkit) by [Huats-Club](https://github.com/huats-club) turorial 8 (Reaper) and tutorial 7 (L-ISA)
+
 ____
 ## L-ISA
 ![L-ISA](Images/L-ISA_Overall.png)<br>
@@ -69,3 +72,11 @@ This is the snapshot that we use for the whole duration of the game, Sources 1 t
 Source 1 and 2 has an FX that keeps them rotating around in a circle across the whole room at 2 points adjacent to each other, ensuring that the BGM is dynamic across the whole room.
 
 Source 3 and 4 are slowly bouncing around the 7 to 8 o'clock position as there is where our game station is, allowing the dialog and sound effects to be heard by the audience.
+
+## Bridging Reaper to L-ISA
+![Snapshots](Images/L-ISA_Bridge.png)<br>
+In order for the L-ISA Controller to receive the audio from the Reaper, some configurations need to be made, such as changing the audio device type as ASIO and sending it to the L-ISA Audio Bridge, which is in the L-ISA Processor.
+
+Then connecting the L-ISA Controller to the L-ISA Processor in the Processor page of the L-ISA Controller.
+![Snapshots](Images/Controller_to_Processor.png)
+
