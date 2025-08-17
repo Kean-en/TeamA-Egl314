@@ -83,328 +83,487 @@ J --LAN--> H
 # MVP Code Logic
 
 ## run.py
+1. `time` -> small delays and timing the button hold
+2. `mido` -> MIDI I/O to talk to both Launchpad Pro MK3s
+3. `RPI.GPIO as GPIO` -> read the physical push button.
+4. `Adafruit_NeoPixel, Color` -> drive the WS2812B LED Strip
+5. `SimpleUDPClient` -> send OSC messages to Reaper and GrandMA3
+6. `lvl_1, lvl_2, lvl_3, Level_cycle` -> your game modules (gameplay + level select)
+### `GPIO Button Setup`
 ```python
-import RPi.GPIO as GPIO
-import time
-import board
-import neopixel
-from pythonosc.udp_client import SimpleUDPClient
-
-import Level_cycle
-import lvl_1
-import lvl_2
-import lvl_3
-
-# --- NeoPixel Config ---
-LED_COUNT = 120
-LED_PIN = board.D18
-strip = neopixel.NeoPixel(LED_PIN, LED_COUNT, brightness=0.5, auto_write=False)
-
-# --- GPIO Setup ---
 BUTTON_PIN = 17
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# --- OSC Clients ---
-REAPER_CLIENT = SimpleUDPClient("192.168.254.12", 8000)
-LIGHT_CLIENT = SimpleUDPClient("192.168.254.213", 2000)
-
-
 ```
-- Imports all necessary modules for GPIO, NeoPixel, OSC, and custom level scripts.
-- Configures a NeoPixel LED strip with 120 LEDs connected to GPIO 18.
-- Sets up GPIO 17 as the input pin for a physical button with a pull-up resistor.
-- Establishes two OSC clients:
-  - One for REAPER (audio cue controller).
-  - One for GrandMA3 (lighting controller).
+- Uses the number inside the chip (GPIO 17)
+- Button is configured as an input with pull-up
+- Read HIGH when idle and LOW when pressed
 
-  ### `Button Hold` Function
-
+### `OSC CLients`
 ```python
-def wait_for_button_hold(threshold=2):
-    print("[INFO] Waiting for button hold to start...")
-    held_time = 0
+REAPER_CLIENT = SimpleUDPClient("192.168.254.12", 8000)
+LIGHT_CLIENT  = SimpleUDPClient("192.168.254.213", 2000)
+```
+- Reaper receives /marker and /action 1007(play)
+- GrandMA3 receives /gma3/cmd commands
+
+### `NeoPixel Setup`
+```python
+LED_COUNT = 120
+LED_PIN   = 18
+strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN)
+strip.begin()
+```
+- 120 LEDS on GPIO 18
+- strip.begin() initializes the LED driver
+### `MIDI Setup` (two launchpads)
+```python
+inport1 = mido.open_input("... MIDI 20:0")
+outport1 = mido.open_output("... MIDI 20:0")
+
+inport2 = mido.open_input("... MIDI 24:0")
+outport2 = mido.open_output("... MIDI 24:0")
+```
+- Opens Player 1 on port 20:0 and Player 2 on 24:0
+- Only read from these in level scripts
+- Use outputs to clear pads
+
+### `send_marker(n)`
+```python
+def send_marker(n: int):
+    REAPER_CLIENT.send_message("/marker", n)
+    REAPER_CLIENT.send_message("/action", 1007)  # ▶ Play
+```
+- Jumps to marker n in REAPER and immediately plays
+- Used in main() for marker 25 (start dialog)
+
+### `clear_launchpads()`
+```python
+def clear_launchpads():
+    for note in range(128):
+        outport1.send(mido.Message('note_off', note=note, velocity=0))
+        outport2.send(mido.Message('note_off', note=note, velocity=0))
+```
+- Sends note_off to all 128 notes on both Launchpads
+- Ensures both grids are fully dark/clean between states
+
+### `strip_color_off()`
+```python
+def strip_color_off():
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, Color(0, 0, 0))
+    strip.show()
+```
+- Turns every LED off and updates the strip
+
+  ### `Button Hold` 
+  ```python
+  def wait_for_2s_hold():
+    print("Hold the button for 2 seconds to start the game...")
+    hold_start = None
+    progress_steps = LED_COUNT
     while True:
         if GPIO.input(BUTTON_PIN) == GPIO.LOW:
-            start_time = time.time()
-            while GPIO.input(BUTTON_PIN) == GPIO.LOW:
-                held_time = time.time() - start_time
-                progress = int((held_time / threshold) * LED_COUNT)
-                for i in range(LED_COUNT):
-                  strip[i] = (255, 255, 255) if i < progress else(0, 0, 0)
-                strip.show()
-                if held_time >= threshold:
-                    print("[INFO] Button held long enough to start!")
-                    REAPER_CLIENT.send_message("/marker/25", 1.0)
-                    REAPER_CLIENT.send_message("/action", 1007)
-                    strip.fill((0, 0, 0))
-                    strip.show()
-                    return
-                time.sleep(0.01)
+            if hold_start is None:
+                hold_start = time.time()
+            held_time = time.time() - hold_start
+            progress = min(int((held_time / 2.0) * progress_steps), LED_COUNT)
+
+            # Green progress bar
+            for i in range(LED_COUNT):
+                strip.setPixelColor(i, Color(0, 255, 0) if i < progress else Color(0, 0, 0))
+            strip.show()
+
+            # Reached 2 seconds → start
+            if held_time >= 2.0:
+                print("[HOLD] 2-second hold detected. Game starting.")
+                print("[OSC] LIGHT: Go+ Sequence 56")
+                LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 56")
+                strip_color_off()
+                return
+        else:
+            # Released early → reset progress bar
+            hold_start = None
+            strip_color_off()
         time.sleep(0.01)
+- Waits until the button is held for 2 seconds continuously
+- Shows a green progress bar across the strip as feedback
+- Triggers GrandMA3 cue (Go+ Sequence 56)
+- Clears the strip and returns to continue program
 
-```
 
-- This function waits for the player to press and hold the physical button connected to GPIO 17.
-- As the player holds the button, the NeoPixel strip progressively lights up green to show progress.
-- If held for the defined `threshold` (default 2 seconds), it:
-  - Sends marker `/marker/25` and `/action/1007` to REAPER via OSC to begin the game.
-  - Turns off the LED strip and returns to continue execution.
 
 ### `main()` Function
 
 ```python
 def main():
-    try:
-        wait_for_button_hold(threshold=2)
-        level = Level_cycle.select_level()
+    wait_for_2s_hold()
+    send_marker(25)  # 🎙️ Start dialog marker (with playback)
+
+    while True:
+        level = Level_cycle.select_level()  # level select UX + markers (26/28) inside
+        clear_launchpads()
+
         if level == 1:
+            REAPER_CLIENT.send_message("/level_start", 1)
             lvl_1.run_level_1(REAPER_CLIENT, LIGHT_CLIENT, strip)
         elif level == 2:
+            REAPER_CLIENT.send_message("/level_start", 2)
             lvl_2.run_level_2(REAPER_CLIENT, LIGHT_CLIENT, strip)
         elif level == 3:
+            REAPER_CLIENT.send_message("/level_start", 3)
             lvl_3.run_level_3(REAPER_CLIENT, LIGHT_CLIENT, strip)
-    except KeyboardInterrupt:
-        print("[EXIT] Cleaning up GPIO")
-        GPIO.cleanup()
+
+        clear_launchpads()
+        strip_color_off()
+        time.sleep(1)
 ```
-- This is the main control function that coordinates the game setup and flow.
-- It starts by calling `wait_for_button_hold()` to make sure the player wants to begin.
-- Then it runs the level selection process using `Level_cycle.select_level()`.
-- Based on the selected level, it calls the corresponding level function:
-  - Level 1 → `run_level_1()`
-  - Level 2 → `run_level_2()`
-  - Level 3 → `run_level_3()`
-- If the player presses Ctrl+C (keyboard interrupt), it cleans up the GPIO resources.
+- Requires the 2-second button hold.
+- Audio start: send_marker(25) to REAPER and auto-play
+- Level selection: calls Level_cycle.select_level()
+- Run selected level
+- Cleanup after level ends
+
+### `Program entry and safe exit`
+```python
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[EXIT] Game interrupted by user.")
+        clear_launchpads()
+        strip_color_off()
+        GPIO.cleanup()
+        exit(0)
+```
+- Running python3 run.py executes main()
+- When pressed CTRL+C, cleans up launchpads, LEDs and GPIO state then exits cleanly
 
 
 ## Level_cycle.py
 
-### `clear_board` Function
+### `imports`
 ```python
-def clear_board(outport):
-    for row in launchpad_grid:
-        for note in row:
-            outport.send(mido.Message('note_on', note=note, velocity=0))
+import RPi.GPIO as GPIO
+import time
+import threading
+import mido
+import random
+from rpi_ws281x import Color, Adafruit_NeoPixel
+from pythonosc import udp_client
+
+BUTTON_PIN = 17
+
+# OSC
+REAPER_CLIENT = udp_client.SimpleUDPClient("192.168.254.12", 8000)
+LIGHT_CLIENT  = udp_client.SimpleUDPClient("192.168.254.213", 2000)
+
+# MIDI (Launchpad used for selection UI)
+MIDI_PORT = "Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0"
+inport  = mido.open_input(MIDI_PORT)
+outport = mido.open_output(MIDI_PORT)
+
+# NeoPixel
+LED_COUNT = 120
+LED_PIN   = 18
+strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN)
+strip.begin()
+
+# GPIO button
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 ```
-- Clears all pads on the Launchpad by sending a note_on message with velocity 0, turning off the lights
+- Initializes OSC, MIDI for one launchpad (selection level), NeoPixel (120 LEDs on GPIO 18), and a GPIO 17 button
 
-### `fill_board` Function
+### `Launchpad grid and visuals`
 ```python
-def fill_board(outport, color):
-    vel = COLOR_MAP[color]
-    for row in launchpad_grid:
-        for note in row:
-            outport.send(mido.Message('note_on', note=note, velocity=vel))
+launchpad_grid = [[(r + 1) * 10 + (c + 1) for c in range(8)] for r in range(8)]
+
+LEVEL_SHAPES = {
+    0: [launchpad_grid[0][4], launchpad_grid[1][4], launchpad_grid[2][4], launchpad_grid[3][4], launchpad_grid[4][4]],
+    1: [launchpad_grid[0][3], launchpad_grid[0][4], launchpad_grid[0][5],
+        launchpad_grid[1][3],
+        launchpad_grid[2][3], launchpad_grid[2][4], launchpad_grid[2][5],
+        launchpad_grid[3][5],
+        launchpad_grid[4][3], launchpad_grid[4][4], launchpad_grid[4][5]],
+    2: [launchpad_grid[0][3], launchpad_grid[0][4], launchpad_grid[0][5],
+        launchpad_grid[1][5],
+        launchpad_grid[2][3], launchpad_grid[2][4], launchpad_grid[2][5],
+        launchpad_grid[3][5],
+        launchpad_grid[4][3], launchpad_grid[4][4], launchpad_grid[4][5]]
+}
+
+# Confirm block (bottom-right 2×2)
+CONFIRM_BLOCK = [launchpad_grid[y][x] for y in range(6, 8) for x in range(6, 8)]
+
+COLOR_OFF   = 0
+COLOR_GREEN = 21
+COLOR_BLUE  = 73
 ```
-- Fills the entire Launchpad grid with a specific color by translating the color into a MIDI velocity and sending it to every pad.
+- `launchpad_grid`: 8x8 pad notes
+- `LEVEL_SHAPES`: blue pad patterns for Level 1/2/3
+- `CONFIRM_BLOCK`: green 2x2 block at bottom-right, press to confirm level
 
-### `show_level` Function
+### `Button event and state`
 ```python
-def show_level(outport, level):
-    clear_board(outport)
-    color = COLOR_MAP['green']
-    for y in range(level):
-        for x in range(8):
-            outport.send(mido.Message('note_on', note=launchpad_grid[y][x], velocity=color))
+button_event = threading.Event()
+level_index  = 0
+
+def button_callback(channel):
+    button_event.set()
+
+GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_callback, bouncetime=300)
 ```
-- Visually shows the current level on the Launchpad by lighting up a number of rows in green equal to the level number.
+- Hardware interrupt sets button_event on a short press (with debounce)
 
-### `fill_pixels` Function
+### `OSC/LED/LP`
 ```python
-def fill_pixels(strip, color, ratio):
-    count = int(ratio * strip.n)
-    for i in range(strip.n):
-        strip[i] = color if i < count else (0, 0, 0)
-    strip.show()
-```
-- Used during button holding to progressively light up the NeoPixel strip based on how long the button is being held, giving visual feedback.
+def send_marker(n: int):
+    REAPER_CLIENT.send_message("/marker", n)
+    REAPER_CLIENT.send_message("/action", 1007)
 
-### `wait_for_start_button` Function
-```python
-def wait_for_start_button(reaper_client):
-    print("[WAIT] Holding button for 2s to start...")
-    hold_time = 2
-    start_time = None
-    filling = False
-
-    while True:
-        if GPIO.input(BUTTON_PIN) == GPIO.LOW:
-            if start_time is None:
-                start_time = time.time()
-            held = time.time() - start_time
-
-            if not filling:
-                print("[FILL] Button held, filling NeoPixel white")
-                filling = True
-
-            fill_pixels(strip, (255, 255, 255), held / hold_time)
-        else:
-            if start_time:
-                if time.time() - start_time >= hold_time:
-                    print("[OSC] REAPER: /marker 25")
-                    reaper_client.send_message("/marker", 25)
-                    reaper_client.send_message("/action", 1007)
-                    strip.fill((0, 0, 0))
-                    strip.show()
-                    return
-            start_time = None
-            filling = False
-            strip.fill((0, 0, 0))
-            strip.show()
-        time.sleep(0.01)
-```
-- Waits for the player to press and hold the physical GPIO button. If the button is held for 2 seconds, it sends OSC messages to REAPER to trigger the game start. While holding, the NeoPixel strip progressively lights up in white as feedback.
-
-### `Shutdown` function
-```python
-if GPIO.input(BUTTON_PIN) == GPIO.LOW:
-    if hold_start is None:
-        hold_start = time.time()
-
-    held_time = time.time() - hold_start
-    progress = min(int((held_time / 3.0) * LED_COUNT), LED_COUNT)
-
-    # Show red fill on NeoPixel as progress bar
-    for i in range(LED_COUNT):
-        if i < progress:
-            strip.setPixelColor(i, Color(255, 0, 0))
-        else:
-            strip.setPixelColor(i, Color(0, 0, 0))
+def show_solid_color(color):
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, color)
     strip.show()
 
-    # Shutdown if held for 3s
-    if held_time >= 3.0:
-        print("[HOLD] Button held 3s → shutdown initiated.")
-        send_marker(31)   # Send OSC marker to REAPER
-        for i in range(strip.numPixels()):
-            strip.setPixelColor(i, Color(0, 0, 0))
+def get_random_color():
+    colors = [Color(255, 0, 0), Color(0, 255, 0), Color(0, 0, 255),
+              Color(255, 255, 0), Color(255, 0, 255), Color(0, 255, 255)]
+    return random.choice(colors)
+
+def run_pixel_wipe():
+    width = 5
+    delay = 0.01
+    n = strip.numPixels()
+
+    for head in range(n + width):
+        for j in range(n):
+            strip.setPixelColor(j, Color(0, 0, 0))
+        for k in range(width):
+            idx = head - k
+            if 0 <= idx < n:
+                strip.setPixelColor(idx, Color(255, 255, 255))
         strip.show()
-        clear_launchpad()
-        time.sleep(1)
-        exit(0)
-```
-- Hold the button for 3 seconds during level selection.
-- NeoPixel strip fills up red as a progress bar.
-- At 3s:
-1. Sends /marker 31 + /action 1007 to REAPER.
-2. Turns off all Launchpad and NeoPixel lights.
-3. Exits the program cleanly.
-### `select_level` Function
-```python
-def select_level(reaper_client):
-    level = 1
-    print("[OSC] REAPER: /marker 26")
-    reaper_client.send_message("/marker", 26)
-    reaper_client.send_message("/action", 1007)
+        time.sleep(delay)
 
-    show_level(outport1, level)
-    show_level(outport2, level)
+    for i in range(n):
+        strip.setPixelColor(i, Color(0, 0, 0))
+    strip.show()
+
+def clear_launchpad():
+    for note in range(0, 128):
+        outport.send(mido.Message('note_on', note=note, velocity=COLOR_OFF))
+
+def draw_level_selection(index):
+    clear_launchpad()
+    for note in LEVEL_SHAPES[index]:
+        outport.send(mido.Message('note_on', note=note, velocity=COLOR_BLUE))
+    for note in CONFIRM_BLOCK:
+        outport.send(mido.Message('note_on', note=note, velocity=COLOR_GREEN))
+```
+- `send_marker` -> REAPER/marker n then /action 1007 (play)
+- `show_solid_color` and `get_random_color` -> strip feedback
+- `run_pixel_wipe` -> white wipe animation
+- `clear_launchpad` and `draw_level_selection` -> paint the current level shape (blue) + confirm block (green)
+
+### `pre-roll`
+```python
+def select_level():
+    global level_index
+    cooldown_until = time.time() + 3
+    hold_start = None
+
+    # Lighting pre-roll
+    LIGHT_CLIENT.send_message("/gma3/cmd", "Off Sequence thru Please")
+    LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 52")
+    time.sleep(1)
+    LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 53")
+
+    # Drain stale MIDI
+    try:
+        while True:
+            msg = inport.receive(block=False)
+            if msg is None:
+                break
+    except Exception:
+        pass
+
+    # Ensure button released
+    while GPIO.input(BUTTON_PIN) == GPIO.LOW:
+        time.sleep(0.01)
+
+    draw_level_selection(level_index)
+    show_solid_color(get_random_color())
+```
+- Runs GrandMA3 pre-roll cues, flushes any stale MIDI, ensures button isnt currently held, then shows current level(blue shape+ green confirm) and fills strip with a random color
+
+### `short press`
+```python
+    SHUTDOWN_HOLD_SECS = 3.0
 
     while True:
-        msg1 = inport1.receive(block=False)
-        msg2 = inport2.receive(block=False)
-        msg = msg1 or msg2
+        # short press → cycle
+        if button_event.is_set():
+            if time.time() < cooldown_until:
+                button_event.clear()
+                continue
+
+            button_event.clear()
+            level_index = (level_index + 1) % 3
+            draw_level_selection(level_index)
+
+            show_solid_color(get_random_color())
+            send_marker(26)  # REAPER: "level select cycle"
+
+            time.sleep(0.3)
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, Color(0, 0, 0))
+            strip.show()
+
+            run_pixel_wipe()
+```
+- Short press cycles levels 1,2 and 3
+- Updates the Launchpad UI, changes strip color
+- Sends /marker 26 to REAPER, and plays wipe animation
+
+### `Confirmed pad`
+```python
+        # confirm on green 2×2
+        msg = inport.receive(block=False)
         if msg and msg.type == 'note_on' and msg.velocity > 0:
-            note = msg.note
+            if msg.note in CONFIRM_BLOCK:
+                clear_launchpad()
+                send_marker(28)  # REAPER: "level confirmed"
+                while GPIO.input(BUTTON_PIN) == GPIO.LOW:
+                    time.sleep(0.01)
+                time.sleep(0.5)
+                return level_index + 1
+```
+- Press any pad in the green confirmed block to lock the level
+- REAPER /marker 28, clear the LP, return 123.
 
-            if note == launchpad_grid[7][7]:  # bottom-right confirm
-                print(f"[LEVEL] Confirmed Level {level} → /marker 28")
-                reaper_client.send_message("/marker", 28)
-                reaper_client.send_message("/action", 1007)
-                clear_board(outport1)
-                clear_board(outport2)
-                return level
+### `Hold to shutdown`
+```python
+        # hold to shutdown (3s)
+        if GPIO.input(BUTTON_PIN) == GPIO.LOW:
+            if hold_start is None:
+                hold_start = time.time()
 
-            if note == launchpad_grid[0][0]:  # top-left cycle
-                level = (level % 3) + 1
-                print(f"[LEVEL] Switched to Level {level}")
-                show_level(outport1, level)
-                show_level(outport2, level)
+            held_time = time.time() - hold_start
+            progress = min(int((held_time / SHUTDOWN_HOLD_SECS) * LED_COUNT), LED_COUNT)
+
+            for i in range(LED_COUNT):
+                strip.setPixelColor(i, Color(255, 0, 0) if i < progress else Color(0, 0, 0))
+            strip.show()
+
+            if held_time >= SHUTDOWN_HOLD_SECS:
+                send_marker(31)  # REAPER: "shutdown"
+                for i in range(strip.numPixels()):
+                    strip.setPixelColor(i, Color(0, 0, 0))
+                strip.show()
+                clear_launchpad()
+                time.sleep(1)
+                exit(0)
+        else:
+            hold_start = None
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, Color(0, 0, 0))
+            strip.show()
+
         time.sleep(0.01)
 ```
-- Handles the level selection process using the Launchpad:
-- Top-left pad cycles through levels 1 to 3.
-- Bottom-right pad confirms selection.
-- Sends OSC messages /marker 26 and /marker 28 to REAPER when selection begins and is confirmed.
-- Shows the current level visually by lighting rows on both Launchpads.
+- Holding the physical button, shows a red progress bar on the strip
+- At 3s, sends REAPER /marker 31, clears visuals, and exits
 
-## lvl_1.py
+## Merged Gameplay logic, lvl_1,2 and 3
 
-### `clear_pixels` Function
+### `Imports`
+```python
+import RPi.GPIO as GPIO
+import time
+import random
+import mido
+import sys
+from rpi_ws281x import Color
+
+NEO_COLORS = {
+    'red': Color(255, 0, 0), 'green': Color(0, 255, 0),
+    'blue': Color(0, 0, 255), 'yellow': Color(255, 255, 0)
+}
+
+COLOR_MAP = {
+    'red': 5, 'green': 21, 'blue': 78, 'yellow': 13,
+    'cyan': 3, 'orange': 37, 'magenta': 54, 'yellowgreen': 91,
+    'white': 122, 'brown': 127, 'off': 0
+}
+
+inport1  = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+outport1 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0")
+inport2  = mido.open_input("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
+outport2 = mido.open_output("Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 24:0")
+
+launchpad_grid = [[81 - 10 * r + c for c in range(8)] for r in range(8)]
+```
+- Color maps for NeoPixel and Launchpad
+- Opens two Launchpads (P1 on 20:0, P2 on 24:0)
+- `launchpad_grid` computes the MK3 note numbers for each pad
+
+### `Strip/board`
 ```python
 def clear_pixels(strip):
     for i in range(strip.numPixels()):
         strip.setPixelColor(i, Color(0, 0, 0))
     strip.show()
-```
-- Turns off all LEDs on the NeoPixel strip by setting each pixel to black and calling .show() to apply the change.
- 
-### `clear_board` Function
-```python
+
 def clear_board(outport):
     for row in launchpad_grid:
         for n in row:
             outport.send(mido.Message('note_on', note=n, velocity=0))
-```
-- def clear_board(outport):
-    for row in launchpad_grid:
-        for n in row:
-            outport.send(mido.Message('note_on', note=n, velocity=0))
 
-### `show_sequence_on_strip` Function
-```python
 def show_sequence_on_strip(strip, sequence):
     num_colors = len(sequence)
-    pixels_per_color = strip.numPixels() // num_colors
-    index = 0
+    pixels_per = strip.numPixels() // num_colors
+    idx = 0
     for color in sequence:
         c = NEO_COLORS[color]
-        for _ in range(pixels_per_color):
-            if index < strip.numPixels():
-                strip.setPixelColor(index, c)
-                index += 1
-    while index < strip.numPixels():
-        strip.setPixelColor(index, Color(0, 0, 0))
-        index += 1
+        for _ in range(pixels_per):
+            if idx < strip.numPixels():
+                strip.setPixelColor(idx, c)
+                idx += 1
+    while idx < strip.numPixels():
+        strip.setPixelColor(idx, Color(0, 0, 0))
+        idx += 1
     strip.show()
 ```
-- Generates a random color sequence with no immediate duplicates. Ensures every color step is unique from the one before it.
+- Clear the strip and Launchpads
+- Display the sequence by segmenting the strip evenly per color step
 
-### `get_2x2_block(x,y)` Function
+### `Sequence and block`
 ```python
+def get_unique_sequence(length):
+    base = ['red', 'green', 'blue', 'yellow']
+    pool = [random.choice(base) for _ in range(length)]
+    while any(pool[i] == pool[i + 1] for i in range(len(pool) - 1)):
+        pool = [random.choice(base) for _ in range(length)]
+    return pool
+
 def get_2x2_block(x, y):
     return [launchpad_grid[y + dy][x + dx] for dy in range(2) for dx in range(2)]
-```
-- Returns the MIDI note numbers for a 2×2 Launchpad block starting at position (x, y).
 
-### `light_block` Function
-```python
 def light_block(outport, block, color):
     vel = COLOR_MAP[color]
     for n in block:
         outport.send(mido.Message('note_on', note=n, velocity=vel))
-```
-- Lights up a given 2×2 Launchpad block with a specified color by translating it into MIDI velocity.
-### `flush_midi_input(inport)` Function
-```python
+
 def flush_midi_input(inport):
     while inport.poll():
         pass
-```
-- Clears any residual MIDI messages from the input buffer to prevent old button presses from affecting the game.
 
-### `setup_blocks` Function
-```python
 def setup_blocks():
     all_positions = [(x, y) for x in range(0, 7, 2) for y in range(0, 7, 2)]
     random.shuffle(all_positions)
     return [get_2x2_block(x, y) for x, y in all_positions]
-```
-- Generates 2×2 Launchpad blocks at valid positions (non-overlapping), shuffles their order for randomness.
-
-### `draw_blocks(player,sequence)` Function
-```python
 
 def draw_blocks(player, sequence):
     player['note_map'].clear()
@@ -414,19 +573,18 @@ def draw_blocks(player, sequence):
         light_block(player['outport'], blk, color)
         for n in blk:
             player['note_map'][n] = (blk, color)
-```
-- Lights up all the blocks for the player's current sequence and stores mapping of each pad to its expected color.
 
-### `restart_sequence(player,sequence)` Function
-```python
 def restart_sequence(player, sequence):
     player['index'] = 0
     clear_board(player['outport'])
     draw_blocks(player, sequence)
 ```
-- Resets a player's progress by clearing the Launchpad and redrawing the full sequence.
+- `get_unique_sequence` avoids adjacent duplicates
+- Blocks are 2x2 regions; `setup_blocks()` gives a shuffled, non-overlapping layout.
+- `draw_blocks` lights up the grid and builds note mappings
+- `restart_sequence` resets the progress for a player
 
-### `flash_winner` Function
+### `winner flash`
 ```python
 def flash_winner(winner):
     for _ in range(3):
@@ -439,180 +597,145 @@ def flash_winner(winner):
         clear_board(outport2)
         time.sleep(0.1)
 ```
--  Win sequence by flashing 3 times on either green (player 1) or red (player 2) on all Launchpads.
+- Flashes both Launchpads 3 times: P1=green, P2=red
 
-### `run_level_1` Function Overall
+### `Level start cues`
 ```python
 def run_level_1(reaper_client, light_client, strip):
+    try:
+        # REAPER: level start mark (per your file uses /marker/26 once)
+        reaper_client.send_message("/marker/26", 1.0)
+
+        # grandMA3 cues
+        light_client.send_message("/gma3/cmd", "Off Sequence thru Please")
+        light_client.send_message("/gma3/cmd", "Go+ Sequence 55")
+        time.sleep(2)
+        light_client.send_message("/gma3/cmd", "Off Sequence thru Please")
+        light_client.send_message("/gma3/cmd", "Go+ Sequence 54")
 ```
-- The core function for Level 1 gameplay.
+- Sends a REAPER cue (/marker/26) and lighting cues
 
-#### Inside this function:
-
-- Sends OSC markers to REAPER and GrandMA3 to start the game lighting and sound.
-- Creates a unique 4-color sequence.
-- Shows it on the NeoPixel strip.
-- Players must press the matching Launchpad blocks in the correct order.
-- If wrong: flashes red, restarts sequence, sends /marker/30.
-- If correct: progresses. First to finish all 4 wins.
-- Sends OSC /marker/27 or /marker/29 to REAPER depending on winner and /action/1007 to trigger playback.
-
-## lvl_2.py
-
-### Similar to lvl_1.py functions except:
+### `Build and show sequence`
 ```python
- seq_len = 8
+        seq_len  = 4  # lvl_2: 8, lvl_3: 12
         sequence = get_unique_sequence(seq_len)
         show_sequence_on_strip(strip, sequence)
+
         clear_board(outport1)
         clear_board(outport2)
 ```
-- Board shows 8 colours in level 2 instead of 4 colours in level 1
+- Lvl 1 uses 4 steps, Lvl 2 -> 8, Lvl3 -> 12
+- Strip shows the full sequence as color segments
+- Clears both Launchpads to prep for gameplay
 
-### `run_level_2` Function Overall
+### `Preparation`
 ```python
-def run_level_2(reaper_client, light_client, strip):
+        last_press_time = [0, 0]
+        debounce_threshold = 0.25
+
+        flush_midi_input(inport1)
+        flush_midi_input(inport2)
+        time.sleep(0.5)
+
+        player_data = [
+            {'inport': inport1, 'outport': outport1, 'state': 'PLAY', 'red_end': 0,
+             'index': 0, 'note_map': {}, 'blocks': setup_blocks()},
+            {'inport': inport2, 'outport': outport2, 'state': 'PLAY', 'red_end': 0,
+             'index': 0, 'note_map': {}, 'blocks': setup_blocks()}
+        ]
+
+        for p in player_data:
+            draw_blocks(p, sequence)
+
+        flush_midi_input(inport1)
+        flush_midi_input(inport2)
+
+        winner_found = False
 ```
-- The core function for Level 2 gameplay.
+- Sets a debounce, flushes inputs, builds per-player state dicts, draws all step blocks, starts with no winner
 
-#### Inside this function:
-
-- Sends OSC markers to REAPER and GrandMA3 to start the game lighting and sound.
-- Creates a unique 8-color sequence.
-- Shows it on the NeoPixel strip.
-- Players must press the matching Launchpad blocks in the correct order.
-- If wrong: flashes red, restarts sequence, sends /marker/30.
-- If correct: progresses. First to finish all 8 wins.
-- Sends OSC /marker/27 or /marker/29 to REAPER depending on winner and /action/1007 to trigger playback.
-
-## lvl_3.py
-
-### Similar to lvl_1.py and lvl_2.py functions except:
+### `Correct press`
 ```python
- seq_len = 12
-        sequence = get_unique_sequence(seq_len)
-        show_sequence_on_strip(strip, sequence)
+        while not winner_found:
+            now = time.time()
+            for i, player in enumerate(player_data):
+                if player['state'] == 'RED':
+                    if now >= player['red_end']:
+                        restart_sequence(player, sequence)
+                        flush_midi_input(player['inport'])
+                        player['state'] = 'PLAY'
+                    continue
+
+                msg = player['inport'].receive(block=False)
+                if msg and msg.type == 'note_on' and msg.velocity > 0:
+                    if now - last_press_time[i] < debounce_threshold:
+                        continue
+                    last_press_time[i] = now
+
+                    note = msg.note
+                    if note in player['note_map']:
+                        blk, pressed = player['note_map'][note]
+                        expected = sequence[player['index']]
+
+                        if pressed == expected:
+                            for n in blk:
+                                player['note_map'].pop(n, None)
+                            light_block(player['outport'], blk, 'off')
+                            player['index'] += 1
+
+                            if player['index'] == len(sequence):
+                                flash_winner(i + 1)
+                                if i == 0:
+                                    reaper_client.send_message("/marker", 27)
+                                    reaper_client.send_message("/action", 1007)
+                                else:
+                                    reaper_client.send_message("/marker", 29)
+                                    reaper_client.send_message("/action", 1007)
+
+                                flush_midi_input(player['inport'])
+                                clear_board(outport1)
+                                clear_board(outport2)
+                                clear_pixels(strip)
+                                winner_found = True
+                                break
+```
+- Reads pad presses, applies debounce, checks if the note belongs to the current step 2x2 block and matches the expected color
+- If correct, turn block off and advance
+- If player finishes all steps, flashes winner
+- REAPER for P1 (/marker 27), P2 (/marker 29)
+
+### `Wrong press`
+```python
+                        else:
+                            # Wrong press
+                            reaper_client.send_message("/marker/30", 1.0)
+
+                            # (lvl_1 uses extra light cues)
+                            light_client.send_message("/gma3/cmd", "Off Sequence thru Please")
+                            light_client.send_message("/gma3/cmd", "Go+ Sequence 58")
+
+                            # Flash player's board red & lockout
+                            for row in launchpad_grid:
+                                for n in row:
+                                    player['outport'].send(mido.Message('note_on', note=n, velocity=COLOR_MAP['red']))
+                            flush_midi_input(player['inport'])
+                            player['state'] = 'RED'
+                            player['red_end'] = now + 1.5
+
+            time.sleep(0.005)
+```
+- Wrong press, sends REAPER /marker/30, flashes player board red, sets a 1.5s lockout, then restarts the sequence for that player
+
+### `Cleanup`
+```python
+    except KeyboardInterrupt:
         clear_board(outport1)
         clear_board(outport2)
+        clear_pixels(strip)
+        GPIO.cleanup()
+        sys.exit(0)
 ```
-- Board shows 12 colours in level 2 instead of 4 or 8 colours in level 1 and 2
-
-### `run_level_3` Function Overall
-```python
-def run_level_3(reaper_client, light_client, strip):
-```
-- The core function for Level 3 gameplay.
-
-#### Inside this function:
-
-- Sends OSC markers to REAPER and GrandMA3 to start the game lighting and sound.
-- Creates a unique 12-color sequence.
-- Shows it on the NeoPixel strip.
-- Players must press the matching Launchpad blocks in the correct order.
-- If wrong: flashes red, restarts sequence, sends /marker/30.
-- If correct: progresses. First to finish all 12 wins.
-- Sends OSC /marker/27 or /marker/29 to REAPER depending on winner and /action/1007 to trigger playback.
-
-## Level_cycle.py
-
-This script manages level selection using a **physical push button** (GPIO 17) and the **Launchpad Pro MK3**.
-
----
-
-###  Purpose
-- Allows players to **cycle through Level 1, 2, or 3**
-- Uses visual feedback on the Launchpad to indicate the current level
-- Waits for the player to **confirm** their selection by pressing a **green 2×2 confirmation block**
----
-### `MIDI` & `GPIO` Setup Functions
-```python
-import RPi.GPIO as GPIO
-import time
-import mido
-
-BUTTON_PIN = 17
-
-MIDI_PORT = "Launchpad Pro MK3:Launchpad Pro MK3 LPProMK3 MIDI 20:0"
-inport = mido.open_input(MIDI_PORT)
-outport = mido.open_output(MIDI_PORT)
-
-launchpad_grid = [[(r + 1) * 10 + (c + 1) for c in range(8)] for r in range(8)]
-```
-- Configures GPIO pin 17 for button input
-- Sets up MIDI input/output for the Launchpad
-- Defines an 8x8 grid of note numbers for pad layout
-
-### `Noted` Functions
-
-```python
-def get_2x2_block(x, y):
-    return [launchpad_grid[y + dy][x + dx] for dy in range(2) for dx in range(2)]
-
-def light_block(block, velocity):
-    for n in block:
-        outport.send(mido.Message('note_on', note=n, velocity=velocity))
-
-def clear_board():
-    for row in launchpad_grid:
-        for note in row:
-            outport.send(mido.Message('note_on', note=note, velocity=0))
-```
-- Returns a square block of 4 Launchpad notes.
-- Lights up a block with a specified velocity (color).
-- Turns off all Launchpad pads.
-
-### Level `Shape Mapping` Functions
-
-```python
-level_shapes = [
-    [(0,0),(2,2),(4,4),(6,6)],
-    [(0,6),(2,4),(4,2),(6,0)],
-    [(3,1),(3,3),(3,5),(3,7)]
-]
-```
-- Predefined block coordinates for each level
-
-- Visually differentiates each level using blue blocks in different shapes
-
-### `Main` Level Selection logic
-```python
-def select_level():
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    import run
-    run.LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 52")
-
-    level = 0
-    confirm_block = get_2x2_block(6, 6)
-    light_block(confirm_block, 21)  # green confirm block
-
-    while True:
-        shape = level_shapes[level]
-        clear_board()
-        light_block(confirm_block, 21)
-        for x, y in shape:
-            light_block(get_2x2_block(x, y), 78)  # blue pads
-
-        if GPIO.input(BUTTON_PIN) == GPIO.LOW:
-            run.REAPER_CLIENT.send_message("/marker/26", 1.0)
-            run.REAPER_CLIENT.send_message("/action", 1007)
-            time.sleep(0.25)
-            level = (level + 1) % 3
-
-        msg = inport.receive(block=False)
-        if msg and msg.type == 'note_on' and msg.velocity > 0:
-            if msg.note in confirm_block:
-                clear_board()
-                return level + 1
-
-        time.sleep(0.01)
-```
-- Initializes button and OSC trigger for lighting cue
-- Cycles through level shapes on button press
-- Waits for user to confirm selection using a green 2x2 pad
-- Returns the selected level as an integer (1, 2, or 3)
-
+- Exit, clears both Launchpads, turns off the strip, releases GPIO
 ## Summary of Controls
 
 | Action                    | Result                                        |
@@ -621,5 +744,6 @@ def select_level():
 | Watch Launchpad visual    | Blue pads change to show different shapes     |
 | Press top-right green pad | Confirm selected level                        |
 | Launchpad clears          | Game begins with selected difficulty level    |
+
 
 
