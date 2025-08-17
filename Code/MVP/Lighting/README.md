@@ -28,12 +28,17 @@ D <--LAN--> E
 ```
 ### Configuration
 ---
+
+Refer to this [GitHub](https://github.com/huats-club/oscstarterkit/blob/c227154c0814446dd5f2b5bf73522bdb8801becc/tutorial5/tutorial5.md) to learn how to setup ***Grandma3*** for **OSC**
+
 This configuration is written in the main python script in order to configure the *GrandMa3* **OSC**. The first line is the **python module** that is needed for **OSC**. The IP and Port below is the address configuration of the Server PI.
 ```
 from pythonosc import udp_client
 
 LIGHT_CLIENT = udp_client.SimpleUDPClient("192.168.254.213", 2000)
 ```
+
+
 ### OSC Commands
 ---
 Below is an example of the message that is send to the Server PI from the Client PI.
