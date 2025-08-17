@@ -32,7 +32,7 @@ Station 4 - Launch Core Override
 2. Neopixel WS2812B
 3. 5V DC Supply
 4. Midi Controller
-5. Push Button
+5. Latch Button
 6. GrandMA3
 7. Yamaha QL1
 
@@ -40,8 +40,9 @@ Station 4 - Launch Core Override
 1. RealVNC 
 2. Visual Studio Code
 3. Raspbian OS
-4. Reaper
-5. L-ISA
+4. Reaper - Version 7.39
+5. L-ISA Processor - Version 3.2.2.5865
+6. L-ISA controller - Version 3.2.2.12429
 ### Python Packages:
 1. GPIO 
 2. rpi_ws281x
@@ -62,7 +63,14 @@ G[Reaper]
 H[grandMA3]
 I[Raspberry PI Server]
 J[GrandMa3 on PC node]
+K[Dante Virtual Soundcard]
+L[L-ISA Processor]
+M[L-ISA Controller]
+N[Yamaha QL1]
+O[Speakers]
 P[Power Source]
+Q[loopMIDI]
+
 
 A --Ground--> B
 A --One Wire--> C
@@ -76,6 +84,14 @@ C --Wifi--> G
 C --Wifi--> I
 I --LAN--> J
 J --LAN--> H
+G --ASIO--> L
+G --TimeCode--> Q
+Q --MTC--> M
+L --L-ISA Audio Bridge--> M
+M --Audio Out--> L
+L --Audio Out--> K
+K --DANTE--> N
+N --Output--> O
 ```
 
 
