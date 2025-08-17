@@ -49,26 +49,23 @@ Refer to the [Audio Folder](https://github.com/Kean-en/TeamA-Egl314/tree/9e6a83c
 ## Final Button
 This section will explain how the **Final Button** activates the ending sequence of the show.
 
-### Software
-1. GrandMA3 onPC 2.2.5.2
 ### Hardware
 1. Push Button
 2. Raspberry Pi 4
 3. Neopixel WS2812B
-4. Grandma3 Console
+
 ### System Diagram
 ``` mermaid
 graph TD
 A[Arcade Button]
 B[Raspberry Pi 4]
 C[LED Strip]
-D[Grandma3 Console]
+
 
 A--GPIO 17-->B
 A--GND-->B
 C--GPIO 18-->B
 C--GND-->B
-B--OSC-->D
 ```
 The Arcade button is connected through **GPIO 17** and **GND**. The LED Strip is connected to **GPIO 18** and **GND**.
 

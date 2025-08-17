@@ -1,8 +1,8 @@
 # Show file
 ## Introduction
-Each team is using the same show file so in order to work seamlessly, each team is allowed 22 Lighting sequences each in the GrandMa3 Playbacks.
+Each team is using the same show file so in order to work seamlessly, each team is allowed 22 Lighting sequences each in the ***GrandMa3*** Playbacks.
 ## Use case
-Our station utilises a few sequences
+Our station utilises a few sequences such as:
 ```
 LIGHT_CLIENT.send_message("/gma3/cmd", "Off thru Sequence")
 LIGHT_CLIENT.send_message("/gma3/cmd", "Go+ Sequence 52")
